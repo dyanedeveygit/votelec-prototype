@@ -250,6 +250,41 @@ export default function HomePage() {
     setBulletinEntries([]);
   }, []);
 
+  // Enter confirms: merges the highlighted item (if any) with current selection, adds all to bulletin
+  const handleConfirmItem = useCallback((item: FlatItem | null) => {
+    // Build merged selection: currently checked + highlighted item
+    const mergedByList: Record<string, Set<string>> = {};
+    for (const [listId, ids] of Object.entries(selectedByList)) {
+      mergedByList[listId] = new Set(ids);
+    }
+    if (item) {
+      if (item.type === 'list-header') {
+        const liste = LISTES.find((l) => l.id === item.listId);
+        if (liste) mergedByList[item.listId] = new Set(liste.candidates.map((c) => c.id));
+      } else {
+        if (!mergedByList[item.listId]) mergedByList[item.listId] = new Set();
+        mergedByList[item.listId].add(item.candidateId);
+      }
+    }
+
+    const toAdd: BulletinEntry[] = [];
+    for (const [listId, ids] of Object.entries(mergedByList)) {
+      const liste = LISTES.find((l) => l.id === listId);
+      if (!liste) continue;
+      for (const candidateId of ids) {
+        const candidate = liste.candidates.find((c) => c.id === candidateId);
+        if (candidate) toAdd.push({ id: candidate.id, name: candidate.name, listId });
+      }
+    }
+    toAdd.sort((a, b) => a.id.localeCompare(b.id));
+
+    setBulletinEntries((prev) => [...prev, ...toAdd]);
+    setSelectedIds(new Set());
+    setSelectedByList({});
+    setQuery('');
+    setFocusedIndex(-1);
+  }, [selectedByList]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!dropdownOpen) return;
 
@@ -271,16 +306,8 @@ export default function HomePage() {
         }
         break;
       case 'Enter': {
-        if (focusedIndex >= 0 && focusedItem) {
-          e.preventDefault();
-          if (focusedItem.type === 'list-header') {
-            handleToggleList(focusedItem.listId);
-          } else {
-            handleToggleCandidate(focusedItem.candidateId, focusedItem.listId);
-          }
-        } else {
-          handleAddSelection();
-        }
+        e.preventDefault();
+        handleConfirmItem(focusedItem);
         break;
       }
       case ' ': {
@@ -299,7 +326,7 @@ export default function HomePage() {
         setFocusedIndex(-1);
         break;
     }
-  }, [dropdownOpen, flatItems, focusedIndex, focusedItem, handleToggleList, handleToggleCandidate, handleAddSelection]);
+  }, [dropdownOpen, flatItems, focusedIndex, focusedItem, handleToggleList, handleToggleCandidate, handleConfirmItem]);
 
   return (
     <div
