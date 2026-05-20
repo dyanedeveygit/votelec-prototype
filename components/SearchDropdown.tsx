@@ -1,6 +1,7 @@
 'use client';
 
-import { SearchResult, SearchGroup, SearchCandidateResult } from '@/types';
+import { useRef, useEffect } from 'react';
+import { SearchResult, SearchGroup, SearchCandidateResult, FlatItem } from '@/types';
 
 interface SearchDropdownProps {
   results: SearchResult[];
@@ -9,6 +10,7 @@ interface SearchDropdownProps {
   onToggleList: (listId: string) => void;
   onAddSelection: () => void;
   totalSelected: number;
+  focusedItem: FlatItem | null;
 }
 
 const PARTY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -66,17 +68,30 @@ function Checkbox({ checked }: { checked: boolean }) {
   );
 }
 
-function ListGroupRow({ group, onToggleList, onToggleCandidate }: {
+function rowBg(isSelected: boolean, isFocused: boolean): string {
+  if (isFocused) return '#e8f5e9';
+  if (isSelected) return '#f0fdf4';
+  return 'white';
+}
+
+function rowBorder(isSelected: boolean, isFocused: boolean): string {
+  return isSelected || isFocused ? '3px solid #3a862d' : '3px solid transparent';
+}
+
+function ListGroupRow({ group, onToggleList, onToggleCandidate, focusedItem }: {
   group: SearchGroup;
   onToggleList: (listId: string) => void;
   onToggleCandidate: (candidateId: string, listId: string) => void;
+  focusedItem: FlatItem | null;
 }) {
-  const listColors = PARTY_COLORS[group.liste.party] ?? { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' };
+  const isHeaderFocused =
+    focusedItem?.type === 'list-header' && focusedItem.listId === group.liste.id;
 
   return (
     <div>
       {/* List header row */}
       <div
+        data-focused={isHeaderFocused ? 'true' : undefined}
         onClick={() => onToggleList(group.liste.id)}
         style={{
           height: '48px',
@@ -86,21 +101,20 @@ function ListGroupRow({ group, onToggleList, onToggleCandidate }: {
           paddingLeft: '12px',
           paddingRight: '12px',
           cursor: 'pointer',
-          backgroundColor: group.allSelected ? '#f0fdf4' : 'white',
-          borderLeft: group.allSelected ? '3px solid #3a862d' : '3px solid transparent',
+          backgroundColor: rowBg(group.allSelected, isHeaderFocused),
+          borderLeft: rowBorder(group.allSelected, isHeaderFocused),
         }}
         onMouseEnter={(e) => {
-          if (!group.allSelected) {
+          if (!group.allSelected && !isHeaderFocused) {
             (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
           }
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.backgroundColor = group.allSelected ? '#f0fdf4' : 'white';
+          (e.currentTarget as HTMLDivElement).style.backgroundColor = rowBg(group.allSelected, isHeaderFocused);
         }}
       >
         <Checkbox checked={group.allSelected} />
 
-        {/* Liste badge */}
         <span
           style={{
             backgroundColor: '#dbeafe',
@@ -143,9 +157,15 @@ function ListGroupRow({ group, onToggleList, onToggleCandidate }: {
       {/* Candidate rows */}
       {group.candidates.map((candidate) => {
         const isSelected = group.selectedIds.has(candidate.id);
+        const isCandidateFocused =
+          focusedItem?.type === 'candidate' &&
+          focusedItem.candidateId === candidate.id &&
+          focusedItem.listId === group.liste.id;
+
         return (
           <div
             key={candidate.id}
+            data-focused={isCandidateFocused ? 'true' : undefined}
             onClick={() => onToggleCandidate(candidate.id, group.liste.id)}
             style={{
               height: '44px',
@@ -155,16 +175,16 @@ function ListGroupRow({ group, onToggleList, onToggleCandidate }: {
               paddingLeft: '16px',
               paddingRight: '12px',
               cursor: 'pointer',
-              backgroundColor: isSelected ? '#f0fdf4' : 'white',
-              borderLeft: isSelected ? '3px solid #3a862d' : '3px solid transparent',
+              backgroundColor: rowBg(isSelected, isCandidateFocused),
+              borderLeft: rowBorder(isSelected, isCandidateFocused),
             }}
             onMouseEnter={(e) => {
-              if (!isSelected) {
+              if (!isSelected && !isCandidateFocused) {
                 (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
               }
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.backgroundColor = isSelected ? '#f0fdf4' : 'white';
+              (e.currentTarget as HTMLDivElement).style.backgroundColor = rowBg(isSelected, isCandidateFocused);
             }}
           >
             <Checkbox checked={isSelected} />
@@ -197,12 +217,19 @@ function ListGroupRow({ group, onToggleList, onToggleCandidate }: {
   );
 }
 
-function IndividualCandidateRow({ result, onToggleCandidate }: {
+function IndividualCandidateRow({ result, onToggleCandidate, focusedItem }: {
   result: SearchCandidateResult;
   onToggleCandidate: (candidateId: string, listId: string) => void;
+  focusedItem: FlatItem | null;
 }) {
+  const isFocused =
+    focusedItem?.type === 'candidate' &&
+    focusedItem.candidateId === result.candidate.id &&
+    focusedItem.listId === result.liste.id;
+
   return (
     <div
+      data-focused={isFocused ? 'true' : undefined}
       onClick={() => onToggleCandidate(result.candidate.id, result.liste.id)}
       style={{
         height: '44px',
@@ -212,16 +239,16 @@ function IndividualCandidateRow({ result, onToggleCandidate }: {
         paddingLeft: '12px',
         paddingRight: '12px',
         cursor: 'pointer',
-        backgroundColor: result.selected ? '#f0fdf4' : 'white',
-        borderLeft: result.selected ? '3px solid #3a862d' : '3px solid transparent',
+        backgroundColor: rowBg(result.selected, isFocused),
+        borderLeft: rowBorder(result.selected, isFocused),
       }}
       onMouseEnter={(e) => {
-        if (!result.selected) {
+        if (!result.selected && !isFocused) {
           (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f9fafb';
         }
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.backgroundColor = result.selected ? '#f0fdf4' : 'white';
+        (e.currentTarget as HTMLDivElement).style.backgroundColor = rowBg(result.selected, isFocused);
       }}
     >
       <Checkbox checked={result.selected} />
@@ -258,7 +285,17 @@ export default function SearchDropdown({
   onToggleList,
   onAddSelection,
   totalSelected,
+  focusedItem,
 }: SearchDropdownProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll focused row into view whenever focus moves
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current.querySelector<HTMLElement>('[data-focused="true"]');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, [focusedItem]);
+
   return (
     <div
       style={{
@@ -273,7 +310,7 @@ export default function SearchDropdown({
       }}
     >
       {/* Scrollable results */}
-      <div style={{ overflowY: 'auto', flex: 1 }}>
+      <div ref={scrollRef} style={{ overflowY: 'auto', flex: 1 }}>
         {results.map((result) => {
           if (result.type === 'list') {
             return (
@@ -282,6 +319,7 @@ export default function SearchDropdown({
                 group={result}
                 onToggleList={onToggleList}
                 onToggleCandidate={onToggleCandidate}
+                focusedItem={focusedItem}
               />
             );
           } else {
@@ -290,6 +328,7 @@ export default function SearchDropdown({
                 key={`candidate-${result.candidate.id}`}
                 result={result}
                 onToggleCandidate={onToggleCandidate}
+                focusedItem={focusedItem}
               />
             );
           }

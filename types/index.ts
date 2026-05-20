@@ -28,3 +28,7 @@ export interface SearchCandidateResult {
 }
 
 export type SearchResult = SearchGroup | SearchCandidateResult;
+
+export type FlatItem =
+  | { type: 'list-header'; listId: string }
+  | { type: 'candidate'; candidateId: string; listId: string };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import BulletinHeader from '@/components/BulletinHeader';
 import CandidateRow from '@/components/CandidateRow';
@@ -8,7 +8,7 @@ import SearchDropdown from '@/components/SearchDropdown';
 import BottomBar from '@/components/BottomBar';
 import { LISTES } from '@/data/election';
 import { searchElection } from '@/lib/search';
-import { SearchGroup, SearchCandidateResult } from '@/types';
+import { SearchGroup, SearchCandidateResult, FlatItem } from '@/types';
 
 interface BulletinEntry {
   id: string;
@@ -87,6 +87,7 @@ export default function HomePage() {
   const [selectedByList, setSelectedByList] = useState<Record<string, Set<string>>>({});
   const [isLast, setIsLast] = useState(false);
   const [bulletinNumber, setBulletinNumber] = useState('01');
+  const [focusedIndex, setFocusedIndex] = useState(-1);
 
   const suffrageMax = 30;
   const suffrageUsed = bulletinEntries.length;
@@ -120,6 +121,31 @@ export default function HomePage() {
   }, [rawResults, selectedIds, selectedByList]);
 
   const dropdownOpen = results.length > 0;
+
+  // Flat ordered list of all navigable rows (list header + candidates)
+  const flatItems = useMemo<FlatItem[]>(() => {
+    const items: FlatItem[] = [];
+    for (const result of rawResults) {
+      if (result.type === 'list') {
+        items.push({ type: 'list-header', listId: result.liste.id });
+        for (const c of result.candidates) {
+          items.push({ type: 'candidate', candidateId: c.id, listId: result.liste.id });
+        }
+      } else {
+        items.push({ type: 'candidate', candidateId: result.candidate.id, listId: result.liste.id });
+      }
+    }
+    return items;
+  }, [rawResults]);
+
+  const focusedItem = focusedIndex >= 0 && focusedIndex < flatItems.length
+    ? flatItems[focusedIndex]
+    : null;
+
+  // Reset focus when results change
+  useEffect(() => {
+    setFocusedIndex(-1);
+  }, [rawResults]);
 
   const totalSelected = useMemo(() => {
     let count = 0;
@@ -223,6 +249,57 @@ export default function HomePage() {
   const handleClearAll = useCallback(() => {
     setBulletinEntries([]);
   }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!dropdownOpen) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => Math.min(prev + 1, flatItems.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => Math.max(prev - 1, -1));
+        break;
+      case 'Tab':
+        e.preventDefault();
+        if (e.shiftKey) {
+          setFocusedIndex(prev => Math.max(prev - 1, -1));
+        } else {
+          setFocusedIndex(prev => Math.min(prev + 1, flatItems.length - 1));
+        }
+        break;
+      case 'Enter': {
+        if (focusedIndex >= 0 && focusedItem) {
+          e.preventDefault();
+          if (focusedItem.type === 'list-header') {
+            handleToggleList(focusedItem.listId);
+          } else {
+            handleToggleCandidate(focusedItem.candidateId, focusedItem.listId);
+          }
+        } else {
+          handleAddSelection();
+        }
+        break;
+      }
+      case ' ': {
+        if (focusedIndex >= 0 && focusedItem) {
+          e.preventDefault();
+          if (focusedItem.type === 'list-header') {
+            handleToggleList(focusedItem.listId);
+          } else {
+            handleToggleCandidate(focusedItem.candidateId, focusedItem.listId);
+          }
+        }
+        break;
+      }
+      case 'Escape':
+        setQuery('');
+        setFocusedIndex(-1);
+        break;
+    }
+  }, [dropdownOpen, flatItems, focusedIndex, focusedItem, handleToggleList, handleToggleCandidate, handleAddSelection]);
 
   return (
     <div
@@ -407,6 +484,7 @@ export default function HomePage() {
             onToggleList={handleToggleList}
             onAddSelection={handleAddSelection}
             totalSelected={totalSelected}
+            focusedItem={focusedItem}
           />
         </div>
       )}
@@ -414,6 +492,7 @@ export default function HomePage() {
       <BottomBar
         query={query}
         onQueryChange={setQuery}
+        onKeyDown={handleKeyDown}
         suffrageCurrent={suffrageUsed}
         suffrageTotal={suffrageMax}
         isLast={isLast}

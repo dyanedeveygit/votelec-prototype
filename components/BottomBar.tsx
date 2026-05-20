@@ -3,6 +3,7 @@
 interface BottomBarProps {
   query: string;
   onQueryChange: (q: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   suffrageCurrent: number;
   suffrageTotal: number;
   isLast: boolean;
@@ -14,6 +15,7 @@ interface BottomBarProps {
 export default function BottomBar({
   query,
   onQueryChange,
+  onKeyDown,
   suffrageCurrent,
   suffrageTotal,
   isLast,
@@ -69,6 +71,7 @@ export default function BottomBar({
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder="Tapez un nom ou numéro..."
             style={{
               flex: 1,
