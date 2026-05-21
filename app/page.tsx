@@ -144,7 +144,7 @@ export default function HomePage() {
 
   // Reset focus when results change
   useEffect(() => {
-    setFocusedIndex(-1);
+    setFocusedIndex(rawResults.length > 0 ? 0 : -1);
   }, [rawResults]);
 
   const totalSelected = useMemo(() => {
